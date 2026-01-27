@@ -21,6 +21,8 @@ import Aggregators from "./pages/Aggregators";
 import News from "./pages/News";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import SubscriptionPlans from "./pages/SubscriptionPlans";
+import ClientPricing from "./pages/portal/ClientPricing";
 
 import ClientLogin from "./pages/portal/ClientLogin";
 import ClientHome from "./pages/portal/ClientHome";
@@ -135,12 +137,14 @@ const App = () => (
           <Route path="/aggregators" element={<ProtectedRoute checkAdmin><Aggregators /></ProtectedRoute>} />
           <Route path="/news" element={<ProtectedRoute checkAdmin><News /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute checkAdmin><Settings /></ProtectedRoute>} />
+          <Route path="/admin/plans" element={<ProtectedRoute checkAdmin><SubscriptionPlans /></ProtectedRoute>} />
 
           {/* КЛИЕНТСКАЯ ЧАСТЬ */}
           <Route path="/portal" element={<ProtectedRoute><ClientHome /></ProtectedRoute>} />
           <Route path="/portal/schedule" element={<ProtectedRoute><ClientSchedule /></ProtectedRoute>} />
           <Route path="/portal/instructors" element={<ProtectedRoute><ClientInstructors /></ProtectedRoute>} />
           <Route path="/portal/profile" element={<ProtectedRoute><ClientProfile /></ProtectedRoute>} />
+          <Route path="/portal/pricing" element={<ProtectedRoute><ClientPricing /></ProtectedRoute>} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -11,12 +11,12 @@ import {
   LogOut, 
   Megaphone,
   Percent,
-  Globe
+  Globe,
+  Tags // <--- 1. ДОБАВИЛИ ИКОНКУ
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
-// ДОБАВИЛИ "export" ПЕРЕД const
 export const Sidebar = () => {
   const location = useLocation();
 
@@ -25,6 +25,7 @@ export const Sidebar = () => {
     { name: "Клиенты", href: "/clients", icon: Users },
     { name: "Расписание", href: "/schedule", icon: Calendar },
     { name: "Абонементы", href: "/subscriptions", icon: CreditCard },
+    { name: "Виды абонементов", href: "/admin/plans", icon: Tags }, // <--- 2. ДОБАВИЛИ НОВЫЙ ПУНКТ
     { name: "Посещаемость", href: "/attendance", icon: ClipboardCheck },
     { name: "Инструкторы", href: "/instructors", icon: UserCog },
     { name: "Новости", href: "/news", icon: Megaphone },
@@ -81,4 +82,3 @@ export const Sidebar = () => {
     </div>
   );
 };
-// СТРОКУ "export default Sidebar" УБРАЛИ
