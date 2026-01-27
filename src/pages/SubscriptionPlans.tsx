@@ -10,6 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, Trash2, Edit, Check } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+// 1. ИМПОРТИРУЕМ МЕНЮ
+import { Sidebar } from "@/components/layout/Sidebar"; 
 
 const SubscriptionPlans = () => {
   const queryClient = useQueryClient();
@@ -45,80 +47,88 @@ const SubscriptionPlans = () => {
   });
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in">
-      <div className="flex justify-between items-center">
-        <div>
-            <h1 className="text-3xl font-bold">Виды абонементов</h1>
-            <p className="text-gray-500">Настройте прайс-лист для клиентов</p>
-        </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingPlan(null)}>
-              <Plus className="mr-2 h-4 w-4" /> Добавить тариф
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg overflow-y-auto max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>{editingPlan ? "Редактировать тариф" : "Новый тариф"}</DialogTitle>
-            </DialogHeader>
-            <PlanForm 
-              initialData={editingPlan} 
-              onSuccess={() => { setIsOpen(false); queryClient.invalidateQueries({ queryKey: ["subscription-plans"] }); }} 
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
+    // 2. ДОБАВЛЯЕМ ОБЕРТКУ С SIDEBAR
+    <div className="flex min-h-screen bg-slate-50">
+      <Sidebar />
+      
+      {/* 3. ДОБАВЛЯЕМ ml-64 (ОТСТУП СЛЕВА ПОД МЕНЮ) */}
+      <main className="flex-1 ml-64 p-8 animate-in fade-in">
+        <div className="max-w-7xl mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Виды абонементов</h1>
+                    <p className="text-gray-500">Настройте прайс-лист для клиентов</p>
+                </div>
+                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                <DialogTrigger asChild>
+                    <Button onClick={() => setEditingPlan(null)}>
+                    <Plus className="mr-2 h-4 w-4" /> Добавить тариф
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg overflow-y-auto max-h-[90vh]">
+                    <DialogHeader>
+                    <DialogTitle>{editingPlan ? "Редактировать тариф" : "Новый тариф"}</DialogTitle>
+                    </DialogHeader>
+                    <PlanForm 
+                    initialData={editingPlan} 
+                    onSuccess={() => { setIsOpen(false); queryClient.invalidateQueries({ queryKey: ["subscription-plans"] }); }} 
+                    />
+                </DialogContent>
+                </Dialog>
+            </div>
 
-      {isLoading ? (
-        <div>Загрузка...</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {plans?.map((plan) => (
-            <Card key={plan.id} className={!plan.is_active ? "opacity-60 border-dashed" : "border-primary/20 shadow-sm"}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
-                <div className="flex gap-1">
-                   <Button variant="ghost" size="icon" onClick={() => { setEditingPlan(plan); setIsOpen(true); }}>
-                      <Edit className="h-4 w-4" />
-                   </Button>
-                   <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => {
-                       if(confirm("Удалить этот тариф?")) deleteMutation.mutate(plan.id);
-                   }}>
-                      <Trash2 className="h-4 w-4" />
-                   </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-4 text-primary">{plan.price.toLocaleString()} ₸</div>
-                <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex justify-between border-b pb-1">
-                        <span>Занятий:</span> <span className="font-semibold">{plan.sessions_count}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                        <span>Срок действия:</span> <span className="font-semibold">{plan.duration_days} дней</span>
-                    </div>
-                    {plan.description && <p className="pt-2 italic text-gray-500">{plan.description}</p>}
-                    
-                    {plan.features && plan.features.length > 0 && (
-                        <div className="pt-2 space-y-1">
-                            {plan.features.map((f: string, i: number) => (
-                                <div key={i} className="flex items-center text-xs">
-                                    <Check className="h-3 w-3 text-green-500 mr-1" /> {f}
-                                </div>
-                            ))}
+            {isLoading ? (
+                <div>Загрузка...</div>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {plans?.map((plan) => (
+                    <Card key={plan.id} className={!plan.is_active ? "opacity-60 border-dashed" : "border-primary/20 shadow-sm"}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
+                        <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => { setEditingPlan(plan); setIsOpen(true); }}>
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => {
+                            if(confirm("Удалить этот тариф?")) deleteMutation.mutate(plan.id);
+                        }}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
                         </div>
-                    )}
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-3xl font-bold mb-4 text-primary">{plan.price.toLocaleString()} ₸</div>
+                        <div className="space-y-2 text-sm text-gray-600">
+                            <div className="flex justify-between border-b pb-1">
+                                <span>Занятий:</span> <span className="font-semibold">{plan.sessions_count}</span>
+                            </div>
+                            <div className="flex justify-between border-b pb-1">
+                                <span>Срок действия:</span> <span className="font-semibold">{plan.duration_days} дней</span>
+                            </div>
+                            {plan.description && <p className="pt-2 italic text-gray-500">{plan.description}</p>}
+                            
+                            {plan.features && plan.features.length > 0 && (
+                                <div className="pt-2 space-y-1">
+                                    {plan.features.map((f: string, i: number) => (
+                                        <div key={i} className="flex items-center text-xs">
+                                            <Check className="h-3 w-3 text-green-500 mr-1" /> {f}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                    </Card>
+                ))}
+                {plans?.length === 0 && (
+                    <div className="col-span-full text-center py-10 text-gray-400">
+                        Нет созданных тарифов. Нажмите "Добавить тариф".
+                    </div>
+                )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-          {plans?.length === 0 && (
-              <div className="col-span-full text-center py-10 text-gray-400">
-                  Нет созданных тарифов. Нажмите "Добавить тариф".
-              </div>
-          )}
+            )}
         </div>
-      )}
+      </main>
     </div>
   );
 };
@@ -138,7 +148,6 @@ const PlanForm = ({ initialData, onSuccess }: { initialData?: any, onSuccess: ()
         mutationFn: async (data: any) => {
             const formattedData = {
                 ...data,
-                // Преобразуем строки в числа и массив
                 price: Number(data.price),
                 sessions_count: Number(data.sessions_count),
                 duration_days: Number(data.duration_days),
