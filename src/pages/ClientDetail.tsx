@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -6,7 +6,7 @@ import { AdminLayout } from "@/components/layout/AdminLayout";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -58,7 +58,7 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  // 2. ПОЛУЧАЕМ АБОНЕМЕНТЫ ЭТОГО КЛИЕНТА
+  // 2. ПОЛУЧАЕМ АБОНЕМЕНТЫ
   const { data: subscriptions, isLoading: isSubsLoading } = useQuery({
     queryKey: ["client-subscriptions", id],
     queryFn: async () => {
@@ -73,32 +73,30 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  // 3. ПОЛУЧАЕМ СПИСОК АКТИВНЫХ ТАРИФОВ (ДЛЯ ВЫДАЧИ)
+  // 3. ПОЛУЧАЕМ ТАРИФЫ
   const { data: plans } = useQuery({
     queryKey: ["active-plans"],
     queryFn: async () => {
-      // Запрашиваем активные тарифы
+      // Запрашиваем ВСЕ тарифы без фильтров, чтобы исключить ошибки базы
       const { data, error } = await supabase
         .from("subscription_plans")
         .select("*")
-        .eq("is_active", true)
-        .order("price"); // Сортируем по цене для удобства
+        .order("price");
       
       if (error) {
-          console.error("Ошибка загрузки тарифов:", error);
+          console.error("ОШИБКА SUPABASE:", error);
           return [];
       }
+      console.log("ПОЛУЧЕНЫ ТАРИФЫ ИЗ БАЗЫ:", data);
       return data as SubscriptionPlan[];
     },
   });
 
-  // Если грузится или клиент не найден
   if (isClientLoading) return <AdminLayout><div className="p-8">Загрузка карточки...</div></AdminLayout>;
   if (!client) return <AdminLayout><div className="p-8 text-red-500">Клиент не найден (ID: {id})</div></AdminLayout>;
 
   return (
     <AdminLayout>
-      {/* Кнопка Назад */}
       <Button
         variant="ghost"
         className="mb-6 gap-2 -ml-2 text-muted-foreground hover:text-foreground"
@@ -128,7 +126,7 @@ const ClientDetail = () => {
             </div>
           </div>
           
-          {/* КНОПКА "ВЫДАТЬ АБОНЕМЕНТ" */}
+          {/* МОДАЛКА ВЫДАЧИ */}
           <Dialog open={isAddSubOpen} onOpenChange={setIsAddSubOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -138,7 +136,12 @@ const ClientDetail = () => {
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Новый абонемент</DialogTitle>
+                {/* ИСПРАВЛЕНИЕ ОШИБКИ WARNING: MISSING DESCRIPTION */}
+                <DialogDescription>
+                    Выберите тариф из списка ниже, чтобы назначить его клиенту.
+                </DialogDescription>
               </DialogHeader>
+              
               <AddSubscriptionForm 
                   userId={client.id} 
                   plans={plans || []} 
@@ -154,58 +157,34 @@ const ClientDetail = () => {
 
       {/* СЕТКА КОНТЕНТА */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* ЛЕВАЯ КОЛОНКА: ИНФО */}
         <div className="space-y-6">
             <Card>
-            <CardHeader>
-                <CardTitle className="text-base font-medium">Контакты</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-base font-medium">Контакты</CardTitle></CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-muted">
                     <Mail className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="text-sm font-medium">{client.email || "—"}</p>
-                </div>
+                    <div><p className="text-sm text-muted-foreground">Email</p><p className="text-sm font-medium">{client.email || "—"}</p></div>
                 </div>
                 <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-muted">
                     <Phone className="w-4 h-4 text-muted-foreground" />
-                </div>
-                <div>
-                    <p className="text-sm text-muted-foreground">Телефон</p>
-                    <p className="text-sm font-medium">{client.phone || "—"}</p>
-                </div>
+                    <div><p className="text-sm text-muted-foreground">Телефон</p><p className="text-sm font-medium">{client.phone || "—"}</p></div>
                 </div>
             </CardContent>
             </Card>
 
             <Card>
-                <CardHeader>
-                    <CardTitle className="text-base font-medium">Баланс занятий</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base font-medium">Баланс занятий</CardTitle></CardHeader>
                 <CardContent>
                     <div className="text-4xl font-bold text-primary">
                         {subscriptions?.reduce((acc, sub) => sub.is_active ? acc + sub.sessions_left : acc, 0) || 0}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">Доступно по всем абонементам</p>
                 </CardContent>
             </Card>
         </div>
 
-        {/* ПРАВАЯ КОЛОНКА: СПИСКИ */}
         <div className="lg:col-span-2 space-y-6">
-            
-            {/* ТАБЛИЦА АБОНЕМЕНТОВ */}
             <Card>
-                <CardHeader>
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                        <CreditCard className="h-4 w-4" /> Абонементы
-                    </CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base font-medium flex items-center gap-2"><CreditCard className="h-4 w-4" /> Абонементы</CardTitle></CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
@@ -217,48 +196,21 @@ const ClientDetail = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {isSubsLoading && <TableRow><TableCell colSpan={4}>Загрузка...</TableCell></TableRow>}
                             {!isSubsLoading && subscriptions?.length === 0 && (
                                 <TableRow><TableCell colSpan={4} className="text-center text-gray-500">Нет абонементов</TableCell></TableRow>
                             )}
                             {subscriptions?.map((sub) => (
                                 <TableRow key={sub.id}>
-                                    <TableCell className="font-medium">
-                                        {sub.plan?.name || "Архивный тариф"}
-                                        {sub.is_active_on_first_visit && !sub.activation_date && (
-                                            <span className="block text-[10px] text-blue-500">Ждет 1-го посещения</span>
-                                        )}
-                                    </TableCell>
+                                    <TableCell className="font-medium">{sub.plan?.name || "Архив"}</TableCell>
                                     <TableCell>{sub.sessions_left} зан.</TableCell>
-                                    <TableCell>
-                                        {sub.end_date 
-                                            ? new Date(sub.end_date).toLocaleDateString() 
-                                            : "—"}
-                                    </TableCell>
-                                    <TableCell>
-                                        <StatusBadge status={sub.is_active ? "active" : "inactive"} />
-                                    </TableCell>
+                                    <TableCell>{sub.end_date ? new Date(sub.end_date).toLocaleDateString() : "—"}</TableCell>
+                                    <TableCell><StatusBadge status={sub.is_active ? "active" : "inactive"} /></TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
                 </CardContent>
             </Card>
-
-            {/* ИСТОРИЯ ПОСЕЩЕНИЙ (ЗАГЛУШКА) */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-base font-medium flex items-center gap-2">
-                        <Calendar className="h-4 w-4" /> История посещений
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                     <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed rounded-lg">
-                        История посещений будет добавлена на следующем этапе
-                     </div>
-                </CardContent>
-            </Card>
-
         </div>
       </div>
     </AdminLayout>
@@ -274,6 +226,11 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
         is_active_on_first_visit: true,
         days_valid: 30
     });
+
+    // ЛОГГИРОВАНИЕ ПРИ ЗАГРУЗКЕ
+    useEffect(() => {
+        console.log("КОМПОНЕНТ ФОРМЫ ПОЛУЧИЛ ТАРИФЫ:", plans);
+    }, [plans]);
 
     const handlePlanChange = (planId: string) => {
         const plan = plans.find(p => p.id === planId);
@@ -329,8 +286,8 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                         <SelectValue placeholder="Нажмите для выбора..." />
                     </SelectTrigger>
                     
-                    {/* Исправление Z-Index и проверка на пустоту */}
                     <SelectContent className="z-[9999] bg-white border shadow-xl max-h-[300px]">
+                        {/* 1. Если данные пришли */}
                         {plans && plans.length > 0 ? (
                             plans.map((plan) => (
                                 <SelectItem key={plan.id} value={plan.id} className="cursor-pointer hover:bg-slate-100">
@@ -338,9 +295,9 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                                 </SelectItem>
                             ))
                         ) : (
+                            /* 2. Если данных нет - показываем заглушку, но НЕ пустой список */
                             <div className="p-3 text-sm text-center text-gray-500">
-                                Нет доступных тарифов.<br/>
-                                <span className="text-xs">Перейдите в "Виды абонементов" чтобы создать их</span>
+                                Тарифы не найдены в базе
                             </div>
                         )}
                     </SelectContent>
@@ -352,31 +309,17 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <Label className="text-muted-foreground">Занятий</Label>
-                            <Input 
-                                type="number" 
-                                value={formData.sessions_left} 
-                                onChange={e => setFormData({...formData, sessions_left: Number(e.target.value)})} 
-                            />
+                            <Input type="number" value={formData.sessions_left} onChange={e => setFormData({...formData, sessions_left: Number(e.target.value)})} />
                         </div>
                         <div>
                             <Label className="text-muted-foreground">Цена</Label>
-                            <Input 
-                                type="number" 
-                                value={formData.price} 
-                                onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
-                            />
+                            <Input type="number" value={formData.price} onChange={e => setFormData({...formData, price: Number(e.target.value)})} />
                         </div>
                     </div>
 
                     <div className="flex items-center space-x-2 pt-2">
-                        <Switch 
-                            checked={formData.is_active_on_first_visit} 
-                            onCheckedChange={c => setFormData({...formData, is_active_on_first_visit: c})} 
-                        />
-                        <div>
-                            <Label>Активация при входе</Label>
-                            <p className="text-xs text-muted-foreground">Срок пойдет с первого посещения</p>
-                        </div>
+                        <Switch checked={formData.is_active_on_first_visit} onCheckedChange={c => setFormData({...formData, is_active_on_first_visit: c})} />
+                        <div><Label>Активация при входе</Label></div>
                     </div>
                 </div>
             )}
