@@ -77,7 +77,17 @@ const ClientDetail = () => {
   const { data: plans } = useQuery({
     queryKey: ["active-plans"],
     queryFn: async () => {
-      const { data } = await supabase.from("subscription_plans").select("*").eq("is_active", true);
+      // Запрашиваем активные тарифы
+      const { data, error } = await supabase
+        .from("subscription_plans")
+        .select("*")
+        .eq("is_active", true)
+        .order("price"); // Сортируем по цене для удобства
+      
+      if (error) {
+          console.error("Ошибка загрузки тарифов:", error);
+          return [];
+      }
       return data as SubscriptionPlan[];
     },
   });
@@ -255,7 +265,7 @@ const ClientDetail = () => {
   );
 };
 
-// --- КОМПОНЕНТ ФОРМЫ (С ОТЛАДКОЙ) ---
+// --- КОМПОНЕНТ ФОРМЫ (ИСПРАВЛЕННЫЙ) ---
 const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, plans: SubscriptionPlan[], onSuccess: () => void }) => {
     const [selectedPlanId, setSelectedPlanId] = useState<string>("");
     const [formData, setFormData] = useState({
@@ -311,24 +321,15 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
 
     return (
         <div className="space-y-4 py-4">
-            
-            {/* --- БЛОК ОТЛАДКИ (Если видите 0 - значит проблема в базе) --- */}
-            <div className="bg-yellow-100 p-2 text-xs text-yellow-800 rounded mb-2">
-                <b>Статус отладки:</b><br/>
-                Загружено тарифов: {plans ? plans.length : "Загрузка..."}<br/>
-                (Если тут 0, проверьте галочку "Активен" в админке)
-            </div>
-            {/* ----------------------------------------------------------- */}
-
             <div className="grid gap-2">
                 <Label>Выберите тариф</Label>
                 
-                <Select onValueChange={handlePlanChange}>
+                <Select onValueChange={handlePlanChange} value={selectedPlanId}>
                     <SelectTrigger>
                         <SelectValue placeholder="Нажмите для выбора..." />
                     </SelectTrigger>
                     
-                    {/* Добавил z-[9999] и bg-white чтобы вытащить список наверх */}
+                    {/* Исправление Z-Index и проверка на пустоту */}
                     <SelectContent className="z-[9999] bg-white border shadow-xl max-h-[300px]">
                         {plans && plans.length > 0 ? (
                             plans.map((plan) => (
@@ -338,7 +339,8 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                             ))
                         ) : (
                             <div className="p-3 text-sm text-center text-gray-500">
-                                Нет данных для отображения
+                                Нет доступных тарифов.<br/>
+                                <span className="text-xs">Перейдите в "Виды абонементов" чтобы создать их</span>
                             </div>
                         )}
                     </SelectContent>
@@ -373,6 +375,7 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                         />
                         <div>
                             <Label>Активация при входе</Label>
+                            <p className="text-xs text-muted-foreground">Срок пойдет с первого посещения</p>
                         </div>
                     </div>
                 </div>
