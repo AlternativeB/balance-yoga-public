@@ -20,12 +20,9 @@ import {
   Calendar,
   CreditCard,
   Plus,
-  CheckCircle,
-  Clock
 } from "lucide-react";
-import { format } from "date-fns"; // Если нет date-fns, удалите и используйте new Date().toLocaleDateString()
 
-// Типы
+// --- ТИПЫ ДАННЫХ ---
 type Client = {
   id: string;
   first_name: string;
@@ -43,6 +40,7 @@ type SubscriptionPlan = {
   duration_days: number;
 };
 
+// --- ГЛАВНЫЙ КОМПОНЕНТ ---
 const ClientDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -53,7 +51,6 @@ const ClientDetail = () => {
   const { data: client, isLoading: isClientLoading } = useQuery({
     queryKey: ["client", id],
     queryFn: async () => {
-      // Ищем в таблице profiles. Если у вас таблица называется по-другому (напр. users), поменяйте тут.
       const { data, error } = await supabase.from("profiles").select("*").eq("id", id).single();
       if (error) throw error;
       return data as Client;
@@ -61,7 +58,7 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  // 2. ПОЛУЧАЕМ АБОНЕМЕНТЫ
+  // 2. ПОЛУЧАЕМ АБОНЕМЕНТЫ ЭТОГО КЛИЕНТА
   const { data: subscriptions, isLoading: isSubsLoading } = useQuery({
     queryKey: ["client-subscriptions", id],
     queryFn: async () => {
@@ -76,7 +73,7 @@ const ClientDetail = () => {
     enabled: !!id,
   });
 
-  // 3. ПОЛУЧАЕМ СПИСОК ТАРИФОВ (для выпадающего списка)
+  // 3. ПОЛУЧАЕМ СПИСОК АКТИВНЫХ ТАРИФОВ (ДЛЯ ВЫДАЧИ)
   const { data: plans } = useQuery({
     queryKey: ["active-plans"],
     queryFn: async () => {
@@ -85,8 +82,9 @@ const ClientDetail = () => {
     },
   });
 
+  // Если грузится или клиент не найден
   if (isClientLoading) return <AdminLayout><div className="p-8">Загрузка карточки...</div></AdminLayout>;
-  if (!client) return <AdminLayout><div className="p-8 text-red-500">Клиент не найден. Возможно, таблица profiles пуста.</div></AdminLayout>;
+  if (!client) return <AdminLayout><div className="p-8 text-red-500">Клиент не найден (ID: {id})</div></AdminLayout>;
 
   return (
     <AdminLayout>
@@ -100,7 +98,7 @@ const ClientDetail = () => {
         Назад к списку
       </Button>
 
-      {/* Шапка профиля */}
+      {/* ШАПКА ПРОФИЛЯ */}
       <div className="page-header mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -120,7 +118,7 @@ const ClientDetail = () => {
             </div>
           </div>
           
-          {/* КНОПКА ВЫДАЧИ АБОНЕМЕНТА */}
+          {/* КНОПКА "ВЫДАТЬ АБОНЕМЕНТ" */}
           <Dialog open={isAddSubOpen} onOpenChange={setIsAddSubOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2">
@@ -144,10 +142,10 @@ const ClientDetail = () => {
         </div>
       </div>
 
-      {/* Сетка контента */}
+      {/* СЕТКА КОНТЕНТА */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Левая колонка: Контакты */}
+        {/* ЛЕВАЯ КОЛОНКА: ИНФО */}
         <div className="space-y-6">
             <Card>
             <CardHeader>
@@ -160,7 +158,7 @@ const ClientDetail = () => {
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="text-sm font-medium">{client.email}</p>
+                    <p className="text-sm font-medium">{client.email || "—"}</p>
                 </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -169,13 +167,12 @@ const ClientDetail = () => {
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground">Телефон</p>
-                    <p className="text-sm font-medium">{client.phone || "Не указан"}</p>
+                    <p className="text-sm font-medium">{client.phone || "—"}</p>
                 </div>
                 </div>
             </CardContent>
             </Card>
 
-            {/* Статистика */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base font-medium">Баланс занятий</CardTitle>
@@ -189,10 +186,10 @@ const ClientDetail = () => {
             </Card>
         </div>
 
-        {/* Правая колонка: Абонементы и история */}
+        {/* ПРАВАЯ КОЛОНКА: СПИСКИ */}
         <div className="lg:col-span-2 space-y-6">
             
-            {/* Список абонементов */}
+            {/* ТАБЛИЦА АБОНЕМЕНТОВ */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -210,13 +207,14 @@ const ClientDetail = () => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {subscriptions?.length === 0 && (
+                            {isSubsLoading && <TableRow><TableCell colSpan={4}>Загрузка...</TableCell></TableRow>}
+                            {!isSubsLoading && subscriptions?.length === 0 && (
                                 <TableRow><TableCell colSpan={4} className="text-center text-gray-500">Нет абонементов</TableCell></TableRow>
                             )}
                             {subscriptions?.map((sub) => (
                                 <TableRow key={sub.id}>
                                     <TableCell className="font-medium">
-                                        {sub.plan?.name || "Архив"}
+                                        {sub.plan?.name || "Архивный тариф"}
                                         {sub.is_active_on_first_visit && !sub.activation_date && (
                                             <span className="block text-[10px] text-blue-500">Ждет 1-го посещения</span>
                                         )}
@@ -237,7 +235,7 @@ const ClientDetail = () => {
                 </CardContent>
             </Card>
 
-            {/* История посещений (Заглушка для будущего шага) */}
+            {/* ИСТОРИЯ ПОСЕЩЕНИЙ (ЗАГЛУШКА) */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-base font-medium flex items-center gap-2">
@@ -246,7 +244,7 @@ const ClientDetail = () => {
                 </CardHeader>
                 <CardContent>
                      <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed rounded-lg">
-                        Здесь будет таблица истории посещений (Пункт 2 из ТЗ)
+                        История посещений будет добавлена на следующем этапе
                      </div>
                 </CardContent>
             </Card>
@@ -257,7 +255,7 @@ const ClientDetail = () => {
   );
 };
 
-// --- КОМПОНЕНТ ФОРМЫ (ВНУТРИ МОДАЛКИ) ---
+// --- КОМПОНЕНТ ФОРМЫ (С ОТЛАДКОЙ) ---
 const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, plans: SubscriptionPlan[], onSuccess: () => void }) => {
     const [selectedPlanId, setSelectedPlanId] = useState<string>("");
     const [formData, setFormData] = useState({
@@ -267,7 +265,6 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
         days_valid: 30
     });
 
-    // Когда выбираем тариф из списка
     const handlePlanChange = (planId: string) => {
         const plan = plans.find(p => p.id === planId);
         if (plan) {
@@ -283,12 +280,10 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
 
     const mutation = useMutation({
         mutationFn: async () => {
-            // Рассчитываем даты
             const now = new Date();
             let activationDate = null;
             let endDate = null;
 
-            // Если НЕ "при первом посещении", значит активен СЕГОДНЯ
             if (!formData.is_active_on_first_visit) {
                 activationDate = now.toISOString();
                 const end = new Date();
@@ -316,18 +311,36 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
 
     return (
         <div className="space-y-4 py-4">
+            
+            {/* --- БЛОК ОТЛАДКИ (Если видите 0 - значит проблема в базе) --- */}
+            <div className="bg-yellow-100 p-2 text-xs text-yellow-800 rounded mb-2">
+                <b>Статус отладки:</b><br/>
+                Загружено тарифов: {plans ? plans.length : "Загрузка..."}<br/>
+                (Если тут 0, проверьте галочку "Активен" в админке)
+            </div>
+            {/* ----------------------------------------------------------- */}
+
             <div className="grid gap-2">
                 <Label>Выберите тариф</Label>
+                
                 <Select onValueChange={handlePlanChange}>
                     <SelectTrigger>
                         <SelectValue placeholder="Нажмите для выбора..." />
                     </SelectTrigger>
-                    <SelectContent>
-                        {plans.map((plan) => (
-                            <SelectItem key={plan.id} value={plan.id}>
-                                {plan.name} — {plan.price.toLocaleString()} ₸
-                            </SelectItem>
-                        ))}
+                    
+                    {/* Добавил z-[9999] и bg-white чтобы вытащить список наверх */}
+                    <SelectContent className="z-[9999] bg-white border shadow-xl max-h-[300px]">
+                        {plans && plans.length > 0 ? (
+                            plans.map((plan) => (
+                                <SelectItem key={plan.id} value={plan.id} className="cursor-pointer hover:bg-slate-100">
+                                    {plan.name} — {plan.price.toLocaleString()} ₸
+                                </SelectItem>
+                            ))
+                        ) : (
+                            <div className="p-3 text-sm text-center text-gray-500">
+                                Нет данных для отображения
+                            </div>
+                        )}
                     </SelectContent>
                 </Select>
             </div>
@@ -344,7 +357,7 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                             />
                         </div>
                         <div>
-                            <Label className="text-muted-foreground">Цена (факт)</Label>
+                            <Label className="text-muted-foreground">Цена</Label>
                             <Input 
                                 type="number" 
                                 value={formData.price} 
@@ -359,8 +372,7 @@ const AddSubscriptionForm = ({ userId, plans, onSuccess }: { userId: string, pla
                             onCheckedChange={c => setFormData({...formData, is_active_on_first_visit: c})} 
                         />
                         <div>
-                            <Label className="font-semibold">Активация при входе</Label>
-                            <p className="text-xs text-muted-foreground">Срок действия пойдет с первого занятия</p>
+                            <Label>Активация при входе</Label>
                         </div>
                     </div>
                 </div>

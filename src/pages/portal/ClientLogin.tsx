@@ -1,167 +1,186 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, ArrowLeft } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { Loader2, Phone, Lock, User } from "lucide-react";
 
 const ClientLogin = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
-  
-  // Состояние для "Забыл пароль"
-  const [isForgotOpen, setIsForgotOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    first_name: "",
-    last_name: "",
-    phone: ""
-  });
+  // Состояние формы
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState(""); // Только для регистрации
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  // --- ЛОГИКА АВТОРИЗАЦИИ ---
+  const handleAuth = async (type: "login" | "register") => {
+    setIsLoading(true);
+    
     try {
-      if (isSignUp) {
-        // РЕГИСТРАЦИЯ
-        const { error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
+      // 1. Очищаем телефон (оставляем только цифры)
+      const cleanPhone = phone.replace(/\D/g, "");
+      
+      if (cleanPhone.length < 10) {
+        toast.error("Введите корректный номер телефона");
+        setIsLoading(false);
+        return;
+      }
+
+      if (password.length < 6) {
+        toast.error("Пароль должен быть не менее 6 символов");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Генерируем "техническую" почту
+      // Вход будет выглядеть как: 77011234567@balance.yoga
+      const fakeEmail = `${cleanPhone}@balance.yoga`;
+
+      if (type === "register") {
+        // --- РЕГИСТРАЦИЯ ---
+        const { data, error } = await supabase.auth.signUp({
+          email: fakeEmail,
+          password: password,
           options: {
             data: {
-              first_name: formData.first_name,
-              last_name: formData.last_name,
-              phone: formData.phone,
-            }
-          }
+              // ВАЖНО: Отправляем чистый телефон в метаданные, 
+              // чтобы SQL-триггер мог найти и склеить аккаунты
+              phone: cleanPhone,
+              full_name: fullName, 
+            },
+          },
         });
+
         if (error) throw error;
-        toast({ title: "Успешно!", description: "Аккаунт создан." });
-        navigate("/portal");
+        
+        // Если авто-вход не сработал сразу (редко, но бывает)
+        if (!data.session) {
+          toast.success("Регистрация успешна! Теперь войдите.");
+        } else {
+          toast.success("Добро пожаловать!");
+          navigate("/portal");
+        }
+
       } else {
-        // ВХОД
+        // --- ВХОД ---
         const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
+          email: fakeEmail,
+          password: password,
         });
+        
         if (error) throw error;
+        toast.success("С возвращением!");
         navigate("/portal");
       }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleResetPassword = async () => {
-    if (!resetEmail) return toast({ variant: "destructive", title: "Введите Email" });
-    setLoading(true);
-    try {
-      // Supabase отправит письмо со ссылкой на сброс
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: window.location.origin + '/portal/update-password', // Нужно будет создать этот роут
-      });
-      if (error) throw error;
-      toast({ title: "Письмо отправлено", description: "Проверьте почту для сброса пароля." });
-      setIsForgotOpen(false);
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Ошибка", description: error.message });
+      console.error(error);
+      let msg = error.message;
+      if (msg.includes("Invalid login")) msg = "Неверный телефон или пароль";
+      if (msg.includes("already registered")) msg = "Этот номер уже зарегистрирован. Попробуйте войти.";
+      toast.error(msg);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-lg">
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center mx-auto mb-3 font-serif font-bold text-xl">B</div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isSignUp ? "Регистрация" : "Balance Yoga"}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-             {isSignUp ? "Создайте аккаунт для записи" : "Вход для клиентов"}
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <Card className="w-full max-w-md shadow-xl border-slate-100">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <User className="w-6 h-6 text-primary" />
+          </div>
+          <CardTitle className="text-2xl font-bold text-slate-900">Balance Yoga</CardTitle>
+          <CardDescription>Вход в личный кабинет</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsTrigger value="login">Вход</TabsTrigger>
+              <TabsTrigger value="register">Регистрация</TabsTrigger>
+            </TabsList>
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          {isSignUp && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2"><Label>Имя</Label><Input required value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} /></div>
-                <div className="space-y-2"><Label>Фамилия</Label><Input required value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} /></div>
+            {/* ВХОД */}
+            <TabsContent value="login" className="space-y-4">
+              <div className="space-y-2">
+                <Label>Номер телефона</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="7701..." 
+                    className="pl-9" 
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
               </div>
-              <div className="space-y-2"><Label>Телефон</Label><Input required type="tel" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} /></div>
-            </>
-          )}
+              <div className="space-y-2">
+                <Label>Пароль</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input 
+                    type="password" 
+                    placeholder="******" 
+                    className="pl-9"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button className="w-full" onClick={() => handleAuth("login")} disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Войти"}
+              </Button>
+            </TabsContent>
 
-          <div className="space-y-2">
-            <Label>Email</Label>
-            <Input required type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <Label>Пароль</Label>
-              {!isSignUp && (
-                <button type="button" onClick={() => setIsForgotOpen(true)} className="text-xs text-primary hover:underline">
-                  Забыли пароль?
-                </button>
-              )}
-            </div>
-            <Input required type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
-          </div>
-
-          <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSignUp ? "Создать аккаунт" : "Войти"}
-          </Button>
-        </form>
-
-        <div className="mt-6 text-center text-sm">
-          <span className="text-gray-500">
-            {isSignUp ? "Уже есть аккаунт?" : "Впервые у нас?"}
-          </span>{" "}
-          <button onClick={() => setIsSignUp(!isSignUp)} className="font-medium text-primary hover:underline">
-            {isSignUp ? "Войти" : "Регистрация"}
-          </button>
-        </div>
-        
-        <div className="mt-8 pt-6 border-t text-center">
-            <Link to="/login" className="text-xs text-muted-foreground hover:text-primary">
-                Вход для администраторов
-            </Link>
-        </div>
-      </div>
-
-      {/* Модалка восстановления пароля */}
-      <Dialog open={isForgotOpen} onOpenChange={setIsForgotOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Восстановление пароля</DialogTitle>
-            <DialogDescription>Введите ваш Email, и мы отправим ссылку для сброса.</DialogDescription>
-          </DialogHeader>
-          <Input 
-            placeholder="example@mail.com" 
-            value={resetEmail} 
-            onChange={(e) => setResetEmail(e.target.value)} 
-          />
-          <DialogFooter>
-            <Button onClick={handleResetPassword} disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Отправить
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {/* РЕГИСТРАЦИЯ */}
+            <TabsContent value="register" className="space-y-4">
+               <div className="space-y-2">
+                <Label>Ваше Имя</Label>
+                <Input 
+                  placeholder="Иван" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Номер телефона</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input 
+                    placeholder="7701..." 
+                    className="pl-9" 
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Придумайте пароль</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                  <Input 
+                    type="password" 
+                    placeholder="Не менее 6 символов" 
+                    className="pl-9"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button className="w-full" onClick={() => handleAuth("register")} disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Зарегистрироваться"}
+              </Button>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };
