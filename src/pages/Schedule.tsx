@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { format, startOfWeek, addDays, parseISO, addMinutes } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Trash2, Plus, Users, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Plus, Users, Pencil, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 // --- ТИПЫ ---
@@ -21,10 +21,11 @@ type Session = {
   start_time: string;
   end_time: string;
   max_capacity: number;
-  class_type: ClassType; // Join
-  class_type_id: string; // Raw ID
-  instructor: Instructor; // Join
-  instructor_id: string; // Raw ID
+  room: string; // <--- НОВОЕ ПОЛЕ
+  class_type: ClassType;
+  class_type_id: string;
+  instructor: Instructor;
+  instructor_id: string;
   bookings_count?: number;
 };
 
@@ -32,11 +33,9 @@ const Schedule = () => {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   
-  // Состояния для модальных окон
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
 
-  // Навигация по неделям
   const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i));
 
@@ -103,7 +102,6 @@ const Schedule = () => {
                 </div>
             </div>
 
-            {/* КНОПКА ДОБАВИТЬ */}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogTrigger asChild>
                     <Button><Plus className="mr-2 h-4 w-4"/> Добавить урок</Button>
@@ -114,7 +112,6 @@ const Schedule = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* МОДАЛКА РЕДАКТИРОВАНИЯ (Открывается, если editingSession не null) */}
             <Dialog open={!!editingSession} onOpenChange={(open) => !open && setEditingSession(null)}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Редактировать занятие</DialogTitle></DialogHeader>
@@ -131,7 +128,7 @@ const Schedule = () => {
             </Dialog>
         </div>
 
-        {/* КАЛЕНДАРЬ */}
+        {/* СЕТКА */}
         <div className="grid grid-cols-7 gap-4 flex-1 overflow-auto min-w-[1000px]">
             {weekDays.map((day) => {
                 const daySessions = sessions?.filter(s => 
@@ -148,7 +145,6 @@ const Schedule = () => {
                         <div className="space-y-2">
                             {daySessions?.map((session) => (
                                 <Card key={session.id} className="shadow-sm hover:shadow-md transition-shadow relative group">
-                                    {/* КНОПКИ ДЕЙСТВИЙ (Появляются при наведении) */}
                                     <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                         <Button 
                                             variant="secondary" size="icon" className="h-6 w-6" 
@@ -174,7 +170,14 @@ const Schedule = () => {
                                         <div className="text-gray-500 text-xs truncate">
                                             {session.instructor?.name}
                                         </div>
-                                        <div className="flex items-center gap-1 mt-2 text-xs text-gray-400">
+                                        
+                                        {/* ОТОБРАЖЕНИЕ ЗАЛА */}
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 font-medium">
+                                            <MapPin className="h-3 w-3" />
+                                            <span>{session.room || "Зал не указан"}</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
                                             <Users className="h-3 w-3" />
                                             <span>{session.bookings_count || 0} / {session.max_capacity}</span>
                                         </div>
@@ -191,9 +194,8 @@ const Schedule = () => {
   );
 };
 
-// --- УНИВЕРСАЛЬНАЯ ФОРМА (И для Создания, и для Редактирования) ---
+// --- ФОРМА ---
 const SessionForm = ({ onSuccess, sessionToEdit }: { onSuccess: () => void, sessionToEdit?: Session }) => {
-    // Грузим справочники
     const { data: types } = useQuery({ 
         queryKey: ["types"], 
         queryFn: async () => (await supabase.from("class_types").select("*")).data as ClassType[] 
@@ -203,7 +205,6 @@ const SessionForm = ({ onSuccess, sessionToEdit }: { onSuccess: () => void, sess
         queryFn: async () => (await supabase.from("instructors").select("*")).data as Instructor[] 
     });
 
-    // Если редактируем - заполняем старыми данными, иначе дефолтные
     const initialDate = sessionToEdit ? format(parseISO(sessionToEdit.start_time), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
     const initialTime = sessionToEdit ? format(parseISO(sessionToEdit.start_time), "HH:mm") : "10:00";
 
@@ -212,7 +213,8 @@ const SessionForm = ({ onSuccess, sessionToEdit }: { onSuccess: () => void, sess
         instructor_id: sessionToEdit?.instructor_id || "",
         date: initialDate,
         time: initialTime,
-        capacity: sessionToEdit?.max_capacity || 10
+        capacity: sessionToEdit?.max_capacity || 10,
+        room: sessionToEdit?.room || "Большой зал" // <--- НОВОЕ ПОЛЕ
     });
 
     const mutation = useMutation({
@@ -230,15 +232,14 @@ const SessionForm = ({ onSuccess, sessionToEdit }: { onSuccess: () => void, sess
                 instructor_id: formData.instructor_id,
                 start_time: startDateTime.toISOString(),
                 end_time: endDateTime.toISOString(),
-                max_capacity: formData.capacity
+                max_capacity: formData.capacity,
+                room: formData.room // <--- ОТПРАВЛЯЕМ В БАЗУ
             };
 
             if (sessionToEdit) {
-                // UPDATE
                 const { error } = await supabase.from("schedule_sessions").update(payload).eq("id", sessionToEdit.id);
                 if (error) throw error;
             } else {
-                // INSERT
                 const { error } = await supabase.from("schedule_sessions").insert(payload);
                 if (error) throw error;
             }
@@ -261,6 +262,19 @@ const SessionForm = ({ onSuccess, sessionToEdit }: { onSuccess: () => void, sess
                     <Label>Время начала</Label>
                     <Input type="time" value={formData.time} onChange={e => setFormData({...formData, time: e.target.value})} />
                 </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label>Зал</Label>
+                {/* ВЫБОР ЗАЛА */}
+                <Select value={formData.room} onValueChange={v => setFormData({...formData, room: v})}>
+                    <SelectTrigger><SelectValue placeholder="Выберите зал" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Большой зал">Большой зал</SelectItem>
+                        <SelectItem value="Малый зал">Малый зал</SelectItem>
+                        <SelectItem value="VIP Зал">VIP Зал</SelectItem>
+                    </SelectContent>
+                </Select>
             </div>
 
             <div className="space-y-2">
